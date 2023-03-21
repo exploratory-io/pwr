@@ -73,3 +73,37 @@ function (n1 = NULL, n2= NULL, d = NULL, sig.level = 0.05, power = NULL,
         alternative = alternative,method = METHOD),
         class = "power.htest")
 }
+
+#' Given the sample ratio of a group r, and other input same as pwr.t2n.test, calculates required total sample size n.
+pwr.t2nr.test <- function(r = 0.5, d = NULL, sig.level = 0.05, power = NULL, alternative = c("two.sided", "less", "greater")) {
+  if (is.null(d) || is.null(power) || is.null(r)) {
+    stop("d and power must be provided")
+  }
+
+  alternative <- match.arg(alternative)
+  ttside <- switch(alternative, less = 1, two.sided = 2, greater = 3)
+  tside <- switch(alternative, less = 1, two.sided = 2, greater = 1)
+
+  if (tside == 2 && !is.null(d)) {
+    d <- abs(d)
+  }
+
+  p.body <- quote({
+    n1 <- r * n
+    n2 <- (1 - r) * n
+    nu <- n1 + n2 - 2
+    switch(ttside,
+      pt(qt(sig.level / tside, nu, lower.tail = TRUE), nu, ncp = d * (1 / sqrt(1 / n1 + 1 / n2)), lower.tail = TRUE),
+      pt(qt(sig.level / tside, nu, lower.tail = FALSE), nu, ncp = d * (1 / sqrt(1 / n1 + 1 / n2)), lower.tail = FALSE) +
+        pt(-qt(sig.level / tside, nu, lower.tail = FALSE), nu, ncp = d * (1 / sqrt(1 / n1 + 1 / n2)), lower.tail = TRUE),
+      pt(qt(sig.level / tside, nu, lower.tail = FALSE), nu, ncp = d * (1 / sqrt(1 / n1 + 1 / n2)), lower.tail = FALSE)
+    )
+  })
+
+  n <- uniroot(function(n) eval(p.body) - power, c(2 + 1e-10, 1e+09))$root
+  n1 <- r * n
+  n2 <- (1 - r) * n
+
+  METHOD <- "t test power calculation"
+  structure(list(n = n, n1 = n1, n2 = n2, d = d, sig.level = sig.level, power = power, alternative = alternative, method = METHOD), class = "power.htest")
+}
